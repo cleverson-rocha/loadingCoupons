@@ -1,0 +1,21 @@
+{
+  "name": "carregar_cupons",
+  "version": "1.0.0",
+  "description": "Aplicação para carregar automaticamente cupons na base.",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "start": "node index.js"
+  },
+  "keywords": [],
+  "author": "Cleverson Rocha",
+  "license": "ISC",
+  "dependencies": {
+    "chalk": "^4.1.2",
+    "cli-progress": "^3.11.2",
+    "fs": "^0.0.1-security",
+    "inquirer": "^9.1.1",
+    "mongodb": "^4.9.1",
+    "randomstring": "^1.2.2"
+  }
+}
