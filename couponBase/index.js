@@ -4,6 +4,8 @@ const { getDb } = require('./db');
 const start = async () => {
   try {
     await connectDb();
+    const arr = await getDb('bonuz', 'experiences').find({ name: 'carrefour-meu-game-carrefour' }).toArray()
+    console.log(arr[0].prizes.length)
 
   } catch (err) {
     console.error(err);
@@ -12,16 +14,8 @@ const start = async () => {
 
 start();
 
-const banco = getDb.collection("coupons")
 
-const prizeList = async () => {
-  return await banco().find({
-    "bucket": {
-      "$in": [
-        "carrefour-agenda-ou-planner",
-        "carrefour-mochila-infantil"
-      ]
-    }
-  })
-};
-console.log(prizeList)
+
+
+// delivery engine coupon
+// if carrefour

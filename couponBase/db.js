@@ -27,18 +27,12 @@ const disconnectDb = async () => {
   }
 };
 
-const getDb = () => {
-  const dbName = process.env.DB_NAME || 'bonuzCoupon';
-  return client.db(dbName);
-}
-
-const toObjectId = (string) => {
-  return ObjectId(stringId);
+const getDb = (dbName, collectionName) => {
+  return client.db(dbName).collection(collectionName)
 }
 
 module.exports = {
   connectDb,
   disconnectDb,
   getDb,
-  toObjectId
 };
