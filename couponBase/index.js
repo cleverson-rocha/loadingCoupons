@@ -1,5 +1,9 @@
+const cliProgress = require('cli-progress');
+const chalk = require('chalk');
+const randomString = require('randomstring');
 const { connectDb, disconnectDb } = require('./db');
 const { getDb } = require('./db');
+const fs = require('fs');
 
 const start = async () => {
   try {
@@ -8,19 +12,92 @@ const start = async () => {
     const arrayMany = await getDb('bonuz', 'prizes').find(
       {
         "active": true,
-        "deliveryEngine": "coupon"
-      }).project(
-        {
-          "name": 1.0,
-          "_id": 0
-        }
-      ).toArray()
+        "$or": [
+          {
+            "deliveryEngine": "coupon"
+          },
+          {
+            "alliance.name": "carrefour"
+          }
+        ]
+      },
+      {
+        "name": 1.0,
+        "_id": 0.0
+      }
+    ).toArray()
 
     const prizeArray = arrayMany.map((prize) => prize.name)
-    console.log(prizeArray)
+    // console.log(prizeArray)
+
+    fs.writeFile('./logs/listaPrizes' + '.txt', prizeArray.join('\n'), (err, data) => {
+      if (err) {
+        return
+      }
+    });
+
+    //Gerador de código
+    function createCodeAlphanumeric() {
+      let alphanumeric = randomString.generate({
+        length: 12,
+        charset: 'alphanumeric'
+      });
+
+      stringCode = alphanumeric.toUpperCase()
+    };
+
+    createCodeAlphanumeric()
 
     // for...of
 
+    for (const prizeList of prizeArray) {
+
+      await getDb('bonuzCoupon', 'testeCoupons').insertMany([
+        {
+          "alliance": "teste_01",
+          "bucket": "carrefour-agenda-ou-planner",
+          "coupon": stringCode,
+          "expirationDate": "2022-12-31T12:00:00.000+0000",
+          "initialDateAvaliable": "2022-09-07T12:00:00.000+0000",
+          "created": "2022-09-07T12:00:00.000+0000",
+          "status": {
+            "name": "issued",
+            "timestamp": "2021-06-29T13:37:10.916+0000",
+            "detail": {
+              "expirationDate": "2021-12-31T03:00:00.000Z"
+            }
+          },
+          "trace": [
+            {
+              "name": "issued",
+              "timestamp": "2021-06-29T13:37:10.916+0000",
+              "detail": {
+                "expirationDate": "2021-12-31T03:00:00.000Z"
+              }
+            },
+            {
+              "name": "created",
+              "detail": {
+                "expirationDate": "2022-12-31T12:00:00.000+0000"
+              },
+              "timestamp": "2022-09-07T12:00:00.000+0000"
+            }
+          ],
+          "batch": {
+            "name": "teste-teste-01-2022-09-07T12:00:00.500Z",
+            "timestamp": "2022-09-07T12:00:00.000+0000"
+          }
+        }
+      ]);
+      // console.log(prizeList);
+
+      // Progress bar
+      const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.legacy);
+
+      bar1.start(prizeList.length, 0);
+      bar1.update(100);
+      bar1.stop();
+    };
   } catch (err) {
     console.error(err);
   } finally {
@@ -29,55 +106,3 @@ const start = async () => {
 }
 
 start();
-
-// db = db.getSiblingDB("bonuz");
-// db.getCollection("prizes").find(
-//   {
-//     "active": true,
-//     "deliveryEngine": "coupon"
-//   },
-//   {
-//     "name": 1.0
-//   }
-// );
-
-
-
-
-
-
-
-
-
-
-
-
-
-
-// db = db.getSiblingDB("bonuzCoupon");
-// db.getCollection("coupons").find(
-//   {
-//     "bucket": {
-//       "$in": [
-//         "carrefour-eco-tupper-500ml",
-//         "carrefour-eco-tupper-1l",
-//         "carrefour-tupperfresh-quadrado-200ml-2-un",
-//         "carrefour-tupperfresh-quadrado-1l",
-//         "carrefour-tupperfresh-retangular-1-6l",
-//         "carrefour-cj-super-instantaneas-slim-1-3l-2-25l-2-un",
-//         "carrefour-cj-tigelas-maravilhosas-500ml-1l-1-8l-3-un",
-//         "carrefour-eco-tupper-1l-moeda-dinheiro",
-//         "carrefour-tupperfresh-quadrado-200ml-2-un-moeda-dinheiro",
-//         "carrefour-tupperfresh-quadrado-1l-moeda-dinheiro",
-//         "carrefour-tupperfresh-retangular-1-6l-moeda-dinheiro",
-//         "carrefour-cj-super-instantaneas-slim-1-3l-2-25l-2-un-moeda-dinheiro",
-//         "carrefour-cj-tigelas-maravilhosas-500ml-1l-1-8l-3-un-moeda-dinheiro",
-//         "carrefour-turbo-chef-300ml-moeda-dinheiro"
-//       ]
-//     }
-//   }
-// ).sort(
-//   {
-//     "_id": -1.0
-//   }
-// );

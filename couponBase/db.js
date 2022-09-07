@@ -12,18 +12,18 @@ const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology:
 const connectDb = async () => {
   try {
     await client.connect();
-    console.log(chalk.bgGreen('Connected to DB!'))
+    console.log(chalk.bgGreen.black('Connected to DB!'))
   } catch (error) {
-    console.log(chalk.bgRedBright('Error connecting to DB, Detail: ', error));
+    console.log(chalk.bgRedBright.black('Error connecting to DB, Detail: ', error));
   }
 };
 
 const disconnectDb = async () => {
   try {
     await client.close();
-    console.log(chalk.bgHex('#FFA500')('Database close successfully!'))
+    console.log(chalk.bgHex('#FFA500').black('Database close successfully!'))
   } catch (error) {
-    console.log(chalk.bgRedBright('Error closing DB, Detail: ', error));
+    console.log(chalk.bgRedBright.black('Error closing DB, Detail: ', error));
   }
 };
 
