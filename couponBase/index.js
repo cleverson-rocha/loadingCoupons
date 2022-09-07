@@ -36,26 +36,20 @@ const start = async () => {
       }
     });
 
-    //Gerador de código
-    function createCodeAlphanumeric() {
-      let alphanumeric = randomString.generate({
+    // for...of
+    for (const prizeList of prizeArray) {
+
+      //Gerador de código
+      const alphanumeric = randomString.generate({
         length: 12,
         charset: 'alphanumeric'
       });
-
-      stringCode = alphanumeric.toUpperCase()
-    };
-
-    createCodeAlphanumeric()
-
-    // for...of
-
-    for (const prizeList of prizeArray) {
+      const stringCode = alphanumeric.toUpperCase()
 
       await getDb('bonuzCoupon', 'testeCoupons').insertMany([
         {
           "alliance": "teste_01",
-          "bucket": "carrefour-agenda-ou-planner",
+          "bucket": prizeList,
           "coupon": stringCode,
           "expirationDate": "2022-12-31T12:00:00.000+0000",
           "initialDateAvaliable": "2022-09-07T12:00:00.000+0000",
@@ -91,13 +85,15 @@ const start = async () => {
       ]);
       // console.log(prizeList);
 
-      // Progress bar
-      const bar1 = new cliProgress.SingleBar({}, cliProgress.Presets.legacy);
-
-      bar1.start(prizeList.length, 0);
-      bar1.update(100);
-      bar1.stop();
     };
+
+    // Progress bar
+    const barProgress = new cliProgress.SingleBar({}, cliProgress.Presets.legacy);
+
+    barProgress.start(prizeArray.length, 0);
+    barProgress.update(prizeArray.length);
+    barProgress.stop();
+
   } catch (err) {
     console.error(err);
   } finally {
