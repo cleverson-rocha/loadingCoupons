@@ -4,6 +4,8 @@ const { connectDb, disconnectDb } = require('./db');
 const { getDb } = require('./db');
 const fs = require('fs');
 
+const qtdCoupon = 4
+
 const start = async () => {
   try {
     await connectDb();
@@ -36,8 +38,12 @@ const start = async () => {
     });
 
     // for...of
-    let i = 1;
-    while (i < 2000) {
+    let i = 0;
+
+    // Calculo de iteração
+    let totalProgress;
+
+    while (i < qtdCoupon) {
 
       for (const prizeList of prizeArray) {
 
@@ -89,15 +95,18 @@ const start = async () => {
       // Incremento da variável de controle While
       i++;
 
-      // // Calculo de iteração
-      // const totalProgress = i * prizeArray.length
 
-      // // create new progress bar
-      // const barProgress = new cliProgress.SingleBar({}, cliProgress.Presets.legacy);
-      // barProgress.start(totalProgress, 0);
-      // barProgress.update(stringCode);
-      // barProgress.stop();
+      // create new progress bar
+      totalProgress = i * prizeArray.length
     };
+
+    console.log(totalProgress)
+
+    // const barProgress = new cliProgress.SingleBar({}, cliProgress.Presets.legacy);
+    // barProgress.start(totalProgress, 0);
+    // barProgress.update(100);
+    // barProgress.stop();
+
 
   } catch (err) {
     console.error(err);
