@@ -1,10 +1,6 @@
-const cliProgress = require('cli-progress');
-const randomString = require('randomstring');
+const fs = require('fs');
 const { connectDb, disconnectDb } = require('./db');
 const { getDb } = require('./db');
-const fs = require('fs');
-
-const qtdCoupon = 4
 
 const start = async () => {
   try {
@@ -24,89 +20,105 @@ const start = async () => {
       },
       {
         "name": 1.0,
+        "alliance.name": 1.0,
+        "alliance.title": 1.0,
         "_id": 0.0
       }
     ).toArray()
 
-    const prizeArray = arrayMany.map((prize) => prize.name)
-    // console.log(prizeArray)
+    const prizeArray = arrayMany.map((prize) => prize.name);
+    // const allianceNameArray = arrayMany.map((prize) => prize.alliance.name);
+    // const allianceTitleArray = arrayMany.map((prize) => prize.alliance.title);
 
-    fs.writeFile('./logs/listaPrizes' + '.txt', prizeArray.join('\n'), (err, data) => {
-      if (err) {
-        return
+    //insert na batch
+
+    codeSearch = await getDb('bonuzCoupon', 'testeBatches').find({},
+      {
+        "code": 1.0,
+        "_id": 0.0
       }
-    });
+    ).sort(
+      {
+        "code": -1.0
+      }
+    ).limit(1).toArray();
 
-    // for...of
-    let i = 0;
+    //   codeSearch = [{code: 123}] 
+    let dbCode = codeSearch.map((testeBatches) => testeBatches.code)
+    //code = [123]
 
-    // Calculo de iteração
-    let totalProgress;
+    let resultCode = dbCode[0]
+    //resultcode = 123
 
-    while (i < qtdCoupon) {
+    if (!resultCode) {
+      resultCode = 0
+    }
 
-      for (const prizeList of prizeArray) {
+    for (const prizeList of prizeArray) {
 
-        // Gerador de código
-        const alphanumeric = randomString.generate({
-          length: 12,
-          charset: 'alphanumeric'
-        });
-        const stringCode = alphanumeric.toUpperCase()
+      resultCode++
 
-        await getDb('bonuzCoupon', 'testeCoupons').insertMany([
-          {
-            "alliance": "teste_01",
-            "bucket": prizeList,
-            "coupon": stringCode,
-            "expirationDate": "2022-12-31T12:00:00.000+0000",
-            "initialDateAvaliable": "2022-09-07T12:00:00.000+0000",
-            "created": "2022-09-07T12:00:00.000+0000",
-            "status": {
-              "name": "issued",
-              "timestamp": "2021-06-29T13:37:10.916+0000",
+      await getDb('bonuzCoupon', 'testeBatches').insertMany([
+        {
+          "file": "loadingCoupons.txt", //nome do arquivo txt utilizado para carregar cupons na base
+          "user": { //Usuário que inseriu a base de cupons
+            "name": "Cleverson Rocha",
+            "email": "cleverson.rocha@minu.co"
+          },
+          "bucket": prizeList,
+          "alliance": {
+            "name": "allianceNameArray",
+            "title": "allianceTitleArray"
+          },
+          "code": resultCode, //sequencial dos documentos na collection
+          "status": {
+            "name": "processed",
+            "timestamp": new Date(), //Data de inserção na collection?
+            "detail": {
+              "couponsAffected": 200,
+              "expirationDate": "2023-12-31T03:00:00.000+0000" //Data de expiração dos cupons
+            }
+          },
+          "trace": [
+            {
+              "name": "processed",
+              "timestamp": new Date(), //Data de inserção na collection?
               "detail": {
-                "expirationDate": "2021-12-31T03:00:00.000Z"
+                "couponsAffected": 200,
+                "expirationDate": "2023-12-31T03:00:00.000+0000" //Data de expiração dos cupons
               }
             },
-            "trace": [
-              {
-                "name": "issued",
-                "timestamp": "2021-06-29T13:37:10.916+0000",
-                "detail": {
-                  "expirationDate": "2021-12-31T03:00:00.000Z"
-                }
-              },
-              {
-                "name": "created",
-                "detail": {
-                  "expirationDate": "2022-12-31T12:00:00.000+0000"
-                },
-                "timestamp": "2022-09-07T12:00:00.000+0000"
-              }
-            ],
-            "batch": {
-              "name": "teste-teste-01-2022-09-07T12:00:00.500Z",
-              "timestamp": "2022-09-07T12:00:00.000+0000"
+            {
+              "name": "processing",
+              "timestamp": new Date() //Data de inserção na collection?
             }
-          }
-        ]);
-      };
-      // Incremento da variável de controle While
-      i++;
-
-
-      // create new progress bar
-      totalProgress = i * prizeArray.length
+          ],
+          "rowsProcessed": 200, //cupons carregados na base
+          "coupons": {
+            "available": 174 //cupons disponíveis
+          },
+          "totalRows": 200, //Total de linhas no documento utilizado para carregar os cupons
+          "initialDate": new Date(), //Data de inserção na collection?
+          "expirationDate": "2023-12-31T03:00:00.000+0000" //Data de expiração dos cupons
+        }
+      ]);
     };
 
-    console.log(totalProgress)
-
-    // const barProgress = new cliProgress.SingleBar({}, cliProgress.Presets.legacy);
-    // barProgress.start(totalProgress, 0);
-    // barProgress.update(100);
-    // barProgress.stop();
-
+    // fs.writeFile('./logs/listaPrizes' + '.txt', prizeArray.join('\n'), (err, data) => {
+    //   if (err) {
+    //     return
+    //   }
+    // });
+    // fs.writeFile('./logs/allianceName' + '.txt', allianceNameArray.join('\n'), (err, data) => {
+    //   if (err) {
+    //     return
+    //   }
+    // });
+    // fs.writeFile('./logs/allianceTitle' + '.txt', allianceTitleArray.join('\n'), (err, data) => {
+    //   if (err) {
+    //     return
+    //   }
+    // });
 
   } catch (err) {
     console.error(err);

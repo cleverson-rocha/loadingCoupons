@@ -14,7 +14,7 @@
     "chalk": "^4.1.2",
     "cli-progress": "^3.11.2",
     "fs": "^0.0.1-security",
-    "mongodb": "^4.9.1",
     "randomstring": "^1.2.2"
-  }
+  },
+  "devDependencies": {}
 }
