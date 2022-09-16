@@ -1,15 +1,18 @@
 const randomString = require('randomstring');
 
-const stringCodeGenerator = () => {
+const codeGenerator = () => {
   let alphanumeric = randomString.generate({
-    length: 12,
+    length: 19,
     charset: 'alphanumeric'
   });
 
-  code = alphanumeric.toUpperCase()
-  // console.log(code)
+  code = alphanumeric
 };
 
+// codeGenerator()
+
 module.exports = {
-  stringCodeGenerator
+  codeGenerator
 };
+
+// console.log(code)
