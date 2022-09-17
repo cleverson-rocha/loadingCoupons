@@ -2,8 +2,9 @@ const { connectDb, disconnectDb } = require('./db');
 const { getDb } = require('./db');
 const ObjectID = require('mongodb').ObjectId;
 const randomString = require('randomstring');
+const chalk = require('chalk');
 
-const amountCoupons = 10;
+const amountCoupons = 125;
 
 const start = async () => {
   try {
@@ -18,7 +19,7 @@ const start = async () => {
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
 
     //busca por prizes ativos, cupons e Carrefour
-    const query = {
+    const prizeQuery = {
       'active': true,
       '$or': [
         {
@@ -29,7 +30,7 @@ const start = async () => {
         }
       ]
     }
-    const options = {
+    const prizeOptions = {
       projection: {
         _id: 0.0,
         name: 1.0,
@@ -41,31 +42,27 @@ const start = async () => {
       }
     }
 
-    const prizeArray = await getDb('bonuz', 'prizes').find(query, options).toArray();
+    const prizeArray = await getDb('bonuz', 'prizes').find(prizeQuery, prizeOptions).toArray();
 
     //Busca na collection batches pelo sequencial
-    codeSearch = await getDb('bonuzCoupon', 'testeBatches').find({},
-      {
-        'code': 1.0,
-        '_id': 0.0
+    const codeQuery = {}
+    const codeOptions = {
+      projection: {
+        code: 1.0,
+        _id: 0,
+      },
+      sort: {
+        code: -1.0
       }
-    ).sort(
-      {
-        'code': -1.0
-      }
-    ).limit(1).toArray();
+    }
 
-    const dbCode = codeSearch.map((testeBatches) => testeBatches.code)
+    const codeSearch = await getDb('bonuzCoupon', 'testeBatches').find(codeQuery, codeOptions[0]).limit(1).toArray();
 
-    let resultCode = dbCode[0]
+    let resultCode = codeSearch
 
     if (!resultCode) {
       resultCode = 0
     }
-
-    //Total de iterações para alimentar a collection batches.coupons.available
-    const totalAmountCoupons = amountCoupons * prizeArray.length
-    console.log(totalAmountCoupons)
 
     //Iteração para a criação do arquivo batche na collection batches
     for (const prizeList of prizeArray) {
@@ -110,7 +107,7 @@ const start = async () => {
           ],
           'rowsProcessed': 200, //cupons carregados na base
           'coupons': {
-            'available': totalAmountCoupons //cupons disponíveis
+            'available': amountCoupons //cupons disponíveis
           },
           'totalRows': 200, //Total de linhas no documento utilizado para carregar os cupons
           'initialDate': new Date(), //Data de inserção na collection?
@@ -140,7 +137,7 @@ const start = async () => {
       const dbBatcheId = bucketProperties._id;
       const jsonDate = dbBatcheTimestemp.toJSON(); //converte o timestamp para concatenar com o name no campo batch na collection coupons
 
-      for (i = 0; i <= amountCoupons; i++) {
+      for (i = 0; i < amountCoupons; i++) {
 
         //gerador de cupons randômico
         const codeGenerator = () => {
@@ -188,6 +185,11 @@ const start = async () => {
         ]);
       };
     }
+
+    //Total geral de cupons
+    const totalAmountCoupons = amountCoupons * prizeArray.length
+    console.log(`Total de cupons inseridos na base: ${chalk.yellowBright(totalAmountCoupons)}`)
+    console.log(`Foram inseridos ${chalk.green(amountCoupons)} cupons por prize`)
 
   } catch (err) {
     console.error(err);
