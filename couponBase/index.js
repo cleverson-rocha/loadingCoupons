@@ -1,46 +1,47 @@
-const fs = require('fs');
 const { connectDb, disconnectDb } = require('./db');
 const { getDb } = require('./db');
-const { codeGenerator } = require('./randomString')
 const ObjectID = require('mongodb').ObjectId;
+const randomString = require('randomstring');
 
-//Construtor de data string
-const event = new Date();
-const jsonDate = event.toJSON();
+const amountCoupons = 10;
 
 const start = async () => {
   try {
     await connectDb();
 
-    // await getDb('bonuzCoupon', 'testeCoupons').deleteMany({});
-    // await getDb('bonuzCoupon', 'testeBatches').deleteMany({});
+    //Apaga todos os documentos das collections
+    await getDb('bonuzCoupon', 'testeCoupons').deleteMany({});
+    await getDb('bonuzCoupon', 'testeBatches').deleteMany({});
+
+    //Definição da data de expiração dos cupons (validade de um ano)
+    const expirationDate = new Date();
+    expirationDate.setFullYear(expirationDate.getFullYear() + 1);
 
     //busca por prizes ativos, cupons e Carrefour
-    const arrayMany = await getDb('bonuz', 'prizes').find(
-      {
-        'active': true,
-        '$or': [
-          {
-            'deliveryEngine': 'coupon'
-          },
-          {
-            'alliance.name': 'carrefour'
-          }
-        ]
-      },
-      {
-        'name': 1.0,
+    const query = {
+      'active': true,
+      '$or': [
+        {
+          'deliveryEngine': 'coupon'
+        },
+        {
+          'alliance.name': 'carrefour'
+        }
+      ]
+    }
+    const options = {
+      projection: {
+        _id: 0.0,
+        name: 1.0,
         'alliance.name': 1.0,
-        'alliance.title': 1.0,
-        '_id': 0.0
+        'alliance.title': 1.0
+      },
+      sort: {
+        _id: -1
       }
-    ).toArray()
+    }
 
-    //corrigir projeção
-
-    const prizeArray = arrayMany.map((prize) => prize.name);
-    const allianceNameArray = arrayMany.map((prize) => prize.alliance.name);
-    const allianceTitleArray = arrayMany.map((prize) => prize.alliance.title);
+    const prizeArray = await getDb('bonuz', 'prizes').find(query, options).toArray();
 
     //Busca na collection batches pelo sequencial
     codeSearch = await getDb('bonuzCoupon', 'testeBatches').find({},
@@ -62,16 +63,15 @@ const start = async () => {
       resultCode = 0
     }
 
-    //Definição da data de expiração dos cupons (validade de um ano)
-    const expirationDate = new Date();
-    expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+    //Total de iterações para alimentar a collection batches.coupons.available
+    const totalAmountCoupons = amountCoupons * prizeArray.length
+    console.log(totalAmountCoupons)
 
     //Iteração para a criação do arquivo batche na collection batches
     for (const prizeList of prizeArray) {
 
+      //sequencial
       resultCode++
-      // prizeCoupon = codeGenerator()
-      // console.log(prizeCoupon)
 
       await getDb('bonuzCoupon', 'testeBatches').insertMany([
         {
@@ -80,10 +80,10 @@ const start = async () => {
             'name': 'Cleverson Rocha',
             'email': 'cleverson.rocha@minu.co'
           },
-          'bucket': prizeList,
+          'bucket': prizeList.name,
           'alliance': {
-            'name': 'allianceNameList',
-            'title': 'allianceTitleList'
+            'name': prizeList.alliance.name,
+            'title': prizeList.alliance.title,
           },
           'code': resultCode, //sequencial do documento inserido na collection
           'status': {
@@ -110,41 +110,24 @@ const start = async () => {
           ],
           'rowsProcessed': 200, //cupons carregados na base
           'coupons': {
-            'available': 174 //cupons disponíveis
+            'available': totalAmountCoupons //cupons disponíveis
           },
           'totalRows': 200, //Total de linhas no documento utilizado para carregar os cupons
           'initialDate': new Date(), //Data de inserção na collection?
           'expirationDate': expirationDate //Data de expiração dos cupons
         }
+
       ]);
 
-      // const bucketProperties = await getDb('bonuzCoupon', 'testeBatches').findOne(
-      //   {
-      //     'bucket': prizeList
-      //   },
-      //   {
-      //     projection: {
-      //       '_id': 1,
-      //       'status.timestamp': 1,
-      //       'bucket': 1
-      //     },
-      //   },
-      //   {
-      //     sort: {
-      //       '_id': -1
-      //     }
-      //   },
-      //   function (err, result) {
-      //     console.log(err);
-      //   }
-      // )
-
-      const query = { "bucket": prizeList }
+      //Consulta batches para popular o campo batch na collection coupons
+      const query = {
+        'bucket': prizeList.name
+      }
       const options = {
         projection: {
-          _id: 1,
-          'status.timestamp': 1,
-          'bucket': 1
+          _id: 1.0,
+          bucket: 1.0,
+          'status.timestamp': 1.0
         },
         sort: {
           _id: -1
@@ -153,61 +136,58 @@ const start = async () => {
 
       const bucketProperties = await getDb('bonuzCoupon', 'testeBatches').findOne(query, options);
 
-      const batcheTimestemp = bucketProperties.status.timestamp;
-      const jsonDate = batcheTimestemp.toJSON();
+      const dbBatcheTimestemp = bucketProperties.status.timestamp;
+      const dbBatcheId = bucketProperties._id;
+      const jsonDate = dbBatcheTimestemp.toJSON(); //converte o timestamp para concatenar com o name no campo batch na collection coupons
 
+      for (i = 0; i <= amountCoupons; i++) {
 
-      // console.log('bucketProperties;', bucketProperties)
+        //gerador de cupons randômico
+        const codeGenerator = () => {
+          let alphanumeric = randomString.generate({
+            length: 19,
+            charset: 'alphanumeric'
+          });
 
-      await getDb('bonuzCoupon', 'testeCoupons').insertMany([
-        {
-          'alliance': 'allianceNameList',
-          'bucket': prizeList,
-          'coupon': 'prizeCoupon',
-          'expirationDate': expirationDate,
-          'initialDateAvaliable': new Date(),
-          'created': new Date(),
-          'status': {
-            'name': 'expired',
-            'timestamp': new Date()
-          },
-          'trace': [
-            {
+          prizeCoupon = alphanumeric
+        };
+
+        codeGenerator()
+
+        await getDb('bonuzCoupon', 'testeCoupons').insertMany([
+          {
+            'alliance': prizeList.alliance.name,
+            'bucket': prizeList.name,
+            'coupon': prizeCoupon,
+            'expirationDate': expirationDate,
+            'initialDateAvaliable': new Date(),
+            'created': new Date(),
+            'status': {
               'name': 'expired',
               'timestamp': new Date()
             },
-            {
-              'name': 'created',
-              'detail': {
-                'expirationDate': expirationDate
+            'trace': [
+              {
+                'name': 'expired',
+                'timestamp': new Date()
               },
-              'timestamp': new Date()
+              {
+                'name': 'created',
+                'detail': {
+                  'expirationDate': expirationDate
+                },
+                'timestamp': new Date()
+              }
+            ],
+            'batch': {
+              'id': ObjectID(dbBatcheId),
+              'name': `${prizeList.name}-${jsonDate}`,
+              'timestamp': dbBatcheTimestemp
             }
-          ],
-          'batch': {
-            'id': ObjectID(bucketProperties._id),
-            'name': `${prizeList}-${jsonDate}`,
-            'timestamp': bucketProperties.status.timestamp
           }
-        }
-      ]);
-    };
-
-    // fs.writeFile('./logs/listaPrizes' + '.txt', prizeArray.join('\n'), (err, data) => {
-    //   if (err) {
-    //     return
-    //   }
-    // });
-    // fs.writeFile('./logs/allianceName' + '.txt', allianceNameArray.join('\n'), (err, data) => {
-    //   if (err) {
-    //     return
-    //   }
-    // });
-    // fs.writeFile('./logs/allianceTitle' + '.txt', allianceTitleArray.join('\n'), (err, data) => {
-    //   if (err) {
-    //     return
-    //   }
-    // });
+        ]);
+      };
+    }
 
   } catch (err) {
     console.error(err);
