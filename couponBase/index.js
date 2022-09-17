@@ -4,19 +4,86 @@ const ObjectID = require('mongodb').ObjectId;
 const randomString = require('randomstring');
 const chalk = require('chalk');
 
-const amountCoupons = 125;
+const amountCoupons = 100;
 
 const start = async () => {
   try {
     await connectDb();
 
-    //Apaga todos os documentos das collections
-    await getDb('bonuzCoupon', 'testeCoupons').deleteMany({});
-    await getDb('bonuzCoupon', 'testeBatches').deleteMany({});
+    //Apaga os documentos expirados, com cupons negativos e zerados na collection batches
+    const dbBatchExpiredQuery = {
+      $or: [
+        {
+          expirationDate: {
+            $lte: new Date()
+          }
+        },
+        {
+          'coupons.available': {
+            $lte: 0
+          }
+        }
+      ]
+    }
+    const dbBatchExpiredOption = {
+      projection: {
+        _id: 1.0,
+        bucket: 1.0,
+        'coupons.available': 1.0,
+        expirationDate: 1.0
+      },
+      sort: {
+        _id: -1.0
+      }
+    }
+
+    const dbBatchExpired = await getDb('bonuzCoupon', 'testeBatches').find(dbBatchExpiredQuery, dbBatchExpiredOption).toArray();
+
+    for (const dbBatchExpiredCoupon of dbBatchExpired) {
+
+      let idBatche = dbBatchExpiredCoupon._id
+
+      await getDb('bonuzCoupon', 'testeBatches').deleteOne({ '_id': ObjectID(idBatche) });
+    }
+
+    //Apaga os documentos com status expired na collection coupons
+    const dbCouponsExpiredQuery = {
+      $or: [
+        {
+          expirationDate: {
+            $lte: new Date()
+          }
+        },
+        {
+          'status.name': 'expired'
+        }
+      ]
+    }
+    const dbCouponsExpiredOption = {
+      projection: {
+        _id: 1.0,
+        expirationDate: 1.0,
+        'status.name': 1.0
+      },
+      sort: {
+        _id: -1.0
+      }
+    }
+
+    const dbCouponsExpired = await getDb('bonuzCoupon', 'testeCoupons').find(dbCouponsExpiredQuery, dbCouponsExpiredOption).toArray();
+
+    for (const dbCouponsExpiredCoupon of dbCouponsExpired) {
+
+      let idPrize = dbCouponsExpiredCoupon._id
+
+      await getDb('bonuzCoupon', 'testeCoupons').deleteOne({ '_id': ObjectID(idPrize) });
+    }
+
 
     //Definição da data de expiração dos cupons (validade de um ano)
     const expirationDate = new Date();
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+
 
     //busca por prizes ativos, cupons e Carrefour
     const prizeQuery = {
@@ -44,6 +111,7 @@ const start = async () => {
 
     const prizeArray = await getDb('bonuz', 'prizes').find(prizeQuery, prizeOptions).toArray();
 
+
     //Busca na collection batches pelo sequencial
     const codeQuery = {}
     const codeOptions = {
@@ -56,13 +124,14 @@ const start = async () => {
       }
     }
 
-    const codeSearch = await getDb('bonuzCoupon', 'testeBatches').find(codeQuery, codeOptions[0]).limit(1).toArray();
+    const codeSearch = await getDb('bonuzCoupon', 'testeBatches').find(codeQuery, codeOptions).limit(1).toArray();
 
-    let resultCode = codeSearch
+    let resultCode = codeSearch[0].code
 
     if (!resultCode) {
       resultCode = 0
     }
+
 
     //Iteração para a criação do arquivo batche na collection batches
     for (const prizeList of prizeArray) {
@@ -82,12 +151,15 @@ const start = async () => {
             'name': prizeList.alliance.name,
             'title': prizeList.alliance.title,
           },
+          'experiences': [
+
+          ],
           'code': resultCode, //sequencial do documento inserido na collection
           'status': {
             'name': 'processed',
             'timestamp': new Date(), //Data de inserção na collection?
             'detail': {
-              'couponsAffected': 200,
+              'couponsAffected': amountCoupons,
               'expirationDate': expirationDate //Data de expiração dos cupons
             }
           },
@@ -96,7 +168,7 @@ const start = async () => {
               'name': 'processed',
               'timestamp': new Date(), //Data de inserção na collection?
               'detail': {
-                'couponsAffected': 200,
+                'couponsAffected': amountCoupons,
                 'expirationDate': expirationDate //Data de expiração dos cupons
               }
             },
@@ -105,16 +177,17 @@ const start = async () => {
               'timestamp': new Date() //Data de inserção na collection?
             }
           ],
-          'rowsProcessed': 200, //cupons carregados na base
+          'rowsProcessed': amountCoupons, //cupons carregados na base
           'coupons': {
             'available': amountCoupons //cupons disponíveis
           },
-          'totalRows': 200, //Total de linhas no documento utilizado para carregar os cupons
+          'totalRows': amountCoupons, //Total de linhas no documento utilizado para carregar os cupons
           'initialDate': new Date(), //Data de inserção na collection?
           'expirationDate': expirationDate //Data de expiração dos cupons
         }
 
       ]);
+
 
       //Consulta batches para popular o campo batch na collection coupons
       const query = {
@@ -160,14 +233,13 @@ const start = async () => {
             'initialDateAvaliable': new Date(),
             'created': new Date(),
             'status': {
-              'name': 'expired',
+              'name': 'created',
+              'detail': {
+                'expirationDate': expirationDate
+              },
               'timestamp': new Date()
             },
             'trace': [
-              {
-                'name': 'expired',
-                'timestamp': new Date()
-              },
               {
                 'name': 'created',
                 'detail': {
@@ -186,10 +258,20 @@ const start = async () => {
       };
     }
 
+
     //Total geral de cupons
-    const totalAmountCoupons = amountCoupons * prizeArray.length
-    console.log(`Total de cupons inseridos na base: ${chalk.yellowBright(totalAmountCoupons)}`)
-    console.log(`Foram inseridos ${chalk.green(amountCoupons)} cupons por prize`)
+    const totalAmountCoupons = amountCoupons * prizeArray.length;
+    console.log(`Total de prizes inseridos: ${chalk.blue.bold(prizeArray.length)}!`);
+    console.log(`Collection coupons => Foram inseridos ${chalk.green(amountCoupons)} cupons para cada prize!`);
+    console.log(`Total de cupons inseridos na base: ${chalk.yellowBright(totalAmountCoupons)}!`);
+
+
+    //Total de documentos apagados
+    const dbDeleteBatches = dbBatchExpired.length
+    console.log(`Collection batches => Foram apagados um total de ${chalk.red(dbDeleteBatches)} documentos expirados ou com base zerada!`);
+
+    const dbDeleteCouponsExpired = dbCouponsExpired.length
+    console.log(`Collection coupons => Foram apagados um total de ${chalk.red(dbDeleteCouponsExpired)} documentos com status Expired!`);
 
   } catch (err) {
     console.error(err);
