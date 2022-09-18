@@ -126,12 +126,12 @@ const start = async () => {
 
     const codeSearch = await getDb('bonuzCoupon', 'testeBatches').find(codeQuery, codeOptions).limit(1).toArray();
 
-    let resultCode = codeSearch[0].code
 
-    if (!resultCode) {
+    if (!codeSearch.length) {
       resultCode = 0
+    } else {
+      resultCode = codeSearch[0].code
     }
-
 
     //Iteração para a criação do arquivo batche na collection batches
     for (const prizeList of prizeArray) {
