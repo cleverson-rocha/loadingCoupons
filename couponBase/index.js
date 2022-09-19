@@ -215,11 +215,11 @@ const start = async () => {
         //gerador de cupons randômico
         const codeGenerator = () => {
           let alphanumeric = randomString.generate({
-            length: 19,
+            length: 8,
             charset: 'alphanumeric'
           });
 
-          prizeCoupon = alphanumeric
+          prizeCoupon = `MINU${alphanumeric.toUpperCase()}`
         };
 
         codeGenerator()
