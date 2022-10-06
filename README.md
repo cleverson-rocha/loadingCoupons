@@ -31,6 +31,14 @@
 3. Criar um gerador de cupons randômico.
 4. Fazer **upsert** nas collections _bonuzCoupon.coupons_ e _bonuzCoupon.batches_.
 
-## Study suggestion
+## Stream
 
-https://nodejs.org/api/stream.html#organization-of-this-document
+https://nodejs.org/docs/latest-v14.x/api/stream.html
+
+- _Writable chunks callback_
+
+  https://nodejs.org/docs/latest-v14.x/api/stream.html#stream_writable_writev_chunks_callback
+
+- _mobile-number-migration_
+
+  https://github.com/Minutrade/mobile-number-migration/tree/da78bbad6005dfa4c82ab28f02762928d1c2027c

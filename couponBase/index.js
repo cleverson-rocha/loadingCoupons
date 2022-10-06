@@ -1,5 +1,6 @@
 const { connectDb, disconnectDb } = require('./db');
 const { getDb } = require('./db');
+const stream = require('stream');
 const ObjectID = require('mongodb').ObjectId;
 const randomString = require('randomstring');
 const chalk = require('chalk');
@@ -141,8 +142,8 @@ const start = async () => {
 
       await getDb('bonuzCoupon', 'testeBatches').insertMany([
         {
-          'file': 'loadingCoupons', //meio pelo qual carregamos a base
-          'user': { //Usuário que inseriu a base de cupons
+          'file': 'loadingCoupons',
+          'user': {
             'name': 'Cleverson Rocha',
             'email': 'cleverson.rocha@minu.co'
           },
@@ -154,36 +155,36 @@ const start = async () => {
           'experiences': [
 
           ],
-          'code': resultCode, //sequencial do documento inserido na collection
+          'code': resultCode,
           'status': {
             'name': 'processed',
-            'timestamp': new Date(), //Data de inserção na collection?
+            'timestamp': new Date(),
             'detail': {
               'couponsAffected': amountCoupons,
-              'expirationDate': expirationDate //Data de expiração dos cupons
+              'expirationDate': expirationDate
             }
           },
           'trace': [
             {
               'name': 'processed',
-              'timestamp': new Date(), //Data de inserção na collection?
+              'timestamp': new Date(),
               'detail': {
                 'couponsAffected': amountCoupons,
-                'expirationDate': expirationDate //Data de expiração dos cupons
+                'expirationDate': expirationDate
               }
             },
             {
               'name': 'processing',
-              'timestamp': new Date() //Data de inserção na collection?
+              'timestamp': new Date()
             }
           ],
-          'rowsProcessed': amountCoupons, //cupons carregados na base
+          'rowsProcessed': amountCoupons,
           'coupons': {
-            'available': amountCoupons //cupons disponíveis
+            'available': amountCoupons
           },
-          'totalRows': amountCoupons, //Total de linhas no documento utilizado para carregar os cupons
-          'initialDate': new Date(), //Data de inserção na collection?
-          'expirationDate': expirationDate //Data de expiração dos cupons
+          'totalRows': amountCoupons,
+          'initialDate': new Date(),
+          'expirationDate': expirationDate
         }
 
       ]);
