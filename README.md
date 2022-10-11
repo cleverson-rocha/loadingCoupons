@@ -31,6 +31,10 @@
 3. Criar um gerador de cupons randômico.
 4. Fazer **upsert** nas collections _bonuzCoupon.coupons_ e _bonuzCoupon.batches_.
 
+## Evoluções
+
+1. Criar uma validação para que a aplicação só carregue cupons em ofertas com um mínimo de 3 meses para vencimento da base.
+
 ## Stream
 
 https://nodejs.org/docs/latest-v14.x/api/stream.html
