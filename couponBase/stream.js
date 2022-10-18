@@ -1,4 +1,4 @@
-const { Writable } = require('stream');
+const { Writable, Readable } = require('stream');
 const ObjectId = require('mongodb').ObjectId;
 const randomString = require('randomstring');
 const chalk = require('chalk');
@@ -6,6 +6,7 @@ const { connectDb, disconnectDb, getDb } = require('./db');
 
 const getBatchesCollection = () => getDb('bonuzCoupon', 'testeBatches');
 const getCouponsCollection = () => getDb('bonuzCoupon', 'testeCoupons');
+const getPrizesCollection = () => getDb('bonuz', 'prizes');
 
 const amountCoupons = 100;
 
@@ -58,8 +59,12 @@ async function start() {
   await connectDb();
   await cleanBatches();
   await cleanCoupons();
-  // const buckets = await createBatches();
-  // await createCoupons(buckets);
+
+  const expirationDate = new Date();
+  expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+
+  const buckets = await createBatches(expirationDate);
+  await createCoupons(buckets, expirationDate);
   await disconnectDb();
   console.timeEnd('Tempo total de processamento');
 }
@@ -74,6 +79,18 @@ async function cleanBatches() {
   const options = { projection: { _id: 1.0, } };
   const streamExpired = await getBatchesCollection().find(query, options).stream();
 
+  async function deleteBatches(batches) {
+    console.log('Executing deleteBatches');
+    const objectIds = batches.map((batch) => ObjectId(batch._id));
+
+    const query = {
+      _id: { $in: objectIds }
+    };
+
+    const result = await getBatchesCollection().deleteMany(query);
+    console.log(`deleteBatches finished, batches.length: ${batches.length} | deletedCount: ${result.deletedCount}`);
+  }
+
   const deleteWritable = new QueueWritable(deleteBatches, 1_000);
 
   streamExpired.pipe(deleteWritable);
@@ -82,18 +99,6 @@ async function cleanBatches() {
     streamExpired.on('end', resolve);
     streamExpired.on('error', reject);
   });
-}
-
-async function deleteBatches(batches) {
-  console.log('Executing deleteBatches');
-  const objectIds = batches.map((batch) => ObjectId(batch._id));
-
-  const query = {
-    _id: { $in: objectIds }
-  };
-
-  const result = await getBatchesCollection().deleteMany(query);
-  console.log(`deleteBatches finished, batches.length: ${batches.length} | deletedCount: ${result.deletedCount}`);
 }
 
 async function cleanCoupons() {
@@ -107,26 +112,205 @@ async function cleanCoupons() {
   const options = { projection: { _id: 1.0, } };
   const streamExpired = await getCouponsCollection().find(query, options).stream();
 
+  async function deleteCoupons(coupons) {
+    console.log('Executing deleteCoupons');
+    const objectIds = coupons.map((coupon) => ObjectId(coupon._id));
+
+    const query = {
+      _id: { $in: objectIds }
+    };
+
+    const result = await getCouponsCollection().deleteMany(query, { writeConcern: { j: false, w: 0 } });
+    console.log(`deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
+  }
+
   const deleteWritable = new QueueWritable(deleteCoupons, 50_000);
 
   streamExpired.pipe(deleteWritable);
 
-  await new Promise((resolve, reject) => {
-    streamExpired.on('end', resolve);
-    streamExpired.on('error', reject);
+  // criar um evento interno para fazer aguardar o drain antes de prosseguir com o pipe
+
+  // await new Promise((resolve, reject) => {
+  //   streamExpired.on('end', resolve);
+  //   streamExpired.on('error', reject);
+  // });
+}
+
+async function createBatches(expirationDate) {
+  const prizes = await getPrizes();
+  const lastBatchCode = await getLastBatchCode();
+  const batches = generateBatches(prizes, lastBatchCode, expirationDate);
+
+  await getBatchesCollection().insertMany(batches);
+
+  return batches;
+}
+
+async function getPrizes() {
+  const prizeQuery = {
+    'active': true,
+    '$or': [{ 'deliveryEngine': 'coupon' }, { 'alliance.name': 'carrefour' }]
+  }
+
+  const prizeOptions = {
+    projection: { _id: 0.0, name: 1.0, 'alliance.name': 1.0, 'alliance.title': 1.0 },
+    sort: { _id: -1 }
+  }
+
+  const prizeArray = await getPrizesCollection().find(prizeQuery, prizeOptions).toArray();
+
+  return prizeArray;
+}
+
+async function getLastBatchCode() {
+  const options = {
+    projection: { code: 1.0, _id: 0 },
+    sort: { code: -1.0 }
+  }
+
+  const [lastBatch] = await getDb('bonuzCoupon', 'testeBatches').find({}, options).limit(1).toArray();
+
+  if (!lastBatch) {
+    return 0;
+  }
+
+  return lastBatch.code;
+}
+
+function generateBatches(prizes, lastBatchCode, expirationDate) {
+  const batches = prizes.map((prize) => createBatch(prize, expirationDate));
+
+  return batches;
+}
+
+function createBatch(prize, expirationDate) {
+  const batch = {
+    'file': 'loadingCoupons',
+    'user': {
+      'name': 'Cleverson Rocha',
+      'email': 'cleverson.rocha@minu.co'
+    },
+    'bucket': prize.name,
+    'alliance': {
+      'name': prize.alliance.name,
+      'title': prize.alliance.title,
+    },
+    'experiences': [
+
+    ],
+    'code': lastBatchCode,
+    'status': {
+      'name': 'processed',
+      'timestamp': new Date(),
+      'detail': {
+        'couponsAffected': amountCoupons,
+        'expirationDate': expirationDate
+      }
+    },
+    'trace': [
+      {
+        'name': 'processed',
+        'timestamp': new Date(),
+        'detail': {
+          'couponsAffected': amountCoupons,
+          'expirationDate': expirationDate
+        }
+      },
+      {
+        'name': 'processing',
+        'timestamp': new Date()
+      }
+    ],
+    'rowsProcessed': amountCoupons,
+    'coupons': {
+      'available': amountCoupons
+    },
+    'totalRows': amountCoupons,
+    'initialDate': new Date(),
+    'expirationDate': expirationDate
+  }
+
+  return batch;
+}
+
+async function createCoupons(batches, expirationDate) {
+  const createCouponsWritable = new QueueWritable(insertCoupons, 10_000);
+
+  async function insertCoupons(coupons) {
+    console.log('Executing insertCoupons');
+    await getCouponsCollection().insertMany(coupons);
+    console.log(`insertCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
+  }
+
+  for (const batch of batches) {
+    const coupons = new Array(amountCoupons).fill().map(() => generateCoupon(batch, expirationDate));
+
+    const readableCoupons = Readable.from(coupons);
+
+    readableCoupons.pipe(createCouponsWritable);
+
+    await new Promise((resolve, reject) => {
+      streamExpired.on('end', resolve);
+      streamExpired.on('error', reject);
+    });
+  }
+}
+
+function generateCoupon(batch, expirationDate) {
+  const couponCode = generateCouponCode();
+
+  const coupon = {
+    'alliance': batch.alliance.name,
+    'bucket': batch.bucket,
+    'coupon': couponCode,
+    'expirationDate': expirationDate,
+    'initialDateAvaliable': new Date(),
+    'created': new Date(),
+    'status': {
+      'name': 'created',
+      'detail': {
+        'expirationDate': expirationDate
+      },
+      'timestamp': new Date()
+    },
+    'trace': [
+      {
+        'name': 'created',
+        'detail': {
+          'expirationDate': expirationDate
+        },
+        'timestamp': new Date()
+      }
+    ],
+    'batch': {
+      'id': ObjectID(dbBatcheId),
+      'name': `${batch.name}-${jsonDate}`,
+      'timestamp': dbBatcheTimestemp
+    }
+  }
+
+  return coupon;
+}
+
+function generateCouponCode() {
+  let alphanumeric = randomString.generate({
+    length: 8,
+    charset: 'alphanumeric'
   });
-}
 
-async function deleteCoupons(coupons) {
-  console.log('Executing deleteCoupons');
-  const objectIds = coupons.map((coupon) => ObjectId(coupon._id));
+  prizeCoupon = `MINU${alphanumeric.toUpperCase()}`
+};
 
-  const query = {
-    _id: { $in: objectIds }
-  };
+// async function deleteBatches(batches) {
+//   console.log('Executing deleteBatches');
+//   const objectIds = batches.map((batch) => ObjectId(batch._id));
 
-  const result = await getCouponsCollection().deleteMany(query, { writeConcern: { j: false, w: 0 } });
-  console.log(`deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
-}
+//   const query = {
+//     _id: { $in: objectIds }
+//   };
+
+//   const result = await getBatchesCollection().deleteMany(query);
+//   console.log(`deleteBatches finished, batches.length: ${batches.length} | deletedCount: ${result.deletedCount}`);
+// }
 
 start();
