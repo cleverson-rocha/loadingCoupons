@@ -21,6 +21,7 @@ class QueueWritable extends Writable {
 
   _write(chunk, encoding, callback) {
     this.queue.push(chunk);
+    console.log('****** Enqueued chunk, current size: ', this.queue.length);
 
     if (this.queue.length === this.queueMaxSize) {
       return this.drainQueue(callback);
@@ -57,22 +58,26 @@ class QueueWritable extends Writable {
 async function start() {
   console.time('Tempo total de processamento');
   await connectDb();
-  await cleanBatches();
-  await cleanCoupons();
+
+  const dateToRemove = new Date();
+  dateToRemove.setMonth(dateToRemove.getMonth() + 1);
+
+  await cleanBatches(dateToRemove);
+  await cleanCoupons(dateToRemove);
 
   const expirationDate = new Date();
   expirationDate.setFullYear(expirationDate.getFullYear() + 1);
 
-  const buckets = await createBatches(expirationDate);
-  await createCoupons(buckets, expirationDate);
+  const batches = await createBatches(expirationDate);
+  await createCoupons(batches, expirationDate);
   await disconnectDb();
   console.timeEnd('Tempo total de processamento');
 }
 
-async function cleanBatches() {
+async function cleanBatches(dateToRemove) {
   const query = {
     $or: [
-      { expirationDate: { $lte: new Date() } },
+      { expirationDate: { $lte: dateToRemove } },
       { 'coupons.available': { $lte: 0 } }
     ]
   }
@@ -101,10 +106,10 @@ async function cleanBatches() {
   });
 }
 
-async function cleanCoupons() {
+async function cleanCoupons(dateToRemove) {
   const query = {
     $or: [
-      { expirationDate: { $lte: new Date() } },
+      { expirationDate: { $lte: dateToRemove } },
       { 'status.name': 'expired' }
     ]
   };
@@ -138,8 +143,9 @@ async function cleanCoupons() {
 
 async function createBatches(expirationDate) {
   const prizes = await getPrizes();
+  const filteredPrizes = await filterEmptyPrizes(prizes);
   const lastBatchCode = await getLastBatchCode();
-  const batches = generateBatches(prizes, lastBatchCode, expirationDate);
+  const batches = generateBatches(filteredPrizes, lastBatchCode, expirationDate);
 
   await getBatchesCollection().insertMany(batches);
 
@@ -152,6 +158,11 @@ async function getPrizes() {
     '$or': [{ 'deliveryEngine': 'coupon' }, { 'alliance.name': 'carrefour' }]
   }
 
+  // SELECT prizes.name
+  // FROM prizes 
+  // WHERE ACTIVE = true AND (delivery = 'coupon' OR allianceName = 'carrefour')
+  // LEFT JOIN batches WHERE prize.name = batches.bucket AND (batches.bucket IS NULL OR batches.available = 0)
+
   const prizeOptions = {
     projection: { _id: 0.0, name: 1.0, 'alliance.name': 1.0, 'alliance.title': 1.0 },
     sort: { _id: -1 }
@@ -160,6 +171,21 @@ async function getPrizes() {
   const prizeArray = await getPrizesCollection().find(prizeQuery, prizeOptions).toArray();
 
   return prizeArray;
+}
+
+// Filtrar da lista de prizes somente aqueles que não possuem batches
+async function filterEmptyPrizes(prizes) {
+  const prizeNames = prizes.map((prize) => prize.name);
+
+  const query = { bucket: { $in: prizeNames } };
+  const options = { projection: { bucket: 1.0, _id: 0.0 } };
+
+  const batches = await getBatchesCollection().find(query, options).toArray();
+  const batchSet = new Set(batches.map((batch) => batch.bucket));
+
+  const emptyPrizes = prizes.filter((prizeName) => !batchSet.has(prizeName));
+
+  return emptyPrizes;
 }
 
 async function getLastBatchCode() {
@@ -178,12 +204,12 @@ async function getLastBatchCode() {
 }
 
 function generateBatches(prizes, lastBatchCode, expirationDate) {
-  const batches = prizes.map((prize) => createBatch(prize, expirationDate));
+  const batches = prizes.map((prize) => createBatch(prize, lastBatchCode, expirationDate));
 
   return batches;
 }
 
-function createBatch(prize, expirationDate) {
+function createBatch(prize, lastBatchCode, expirationDate) {
   const batch = {
     'file': 'loadingCoupons',
     'user': {
@@ -234,12 +260,13 @@ function createBatch(prize, expirationDate) {
 }
 
 async function createCoupons(batches, expirationDate) {
+  console.log('started createCoupons | batches.length: ', batches.length);
   const createCouponsWritable = new QueueWritable(insertCoupons, 10_000);
 
   async function insertCoupons(coupons) {
     console.log('Executing insertCoupons');
     await getCouponsCollection().insertMany(coupons);
-    console.log(`insertCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
+    console.log(`insertCoupons finished, coupons.length: ${coupons.length}`);
   }
 
   for (const batch of batches) {
@@ -249,11 +276,15 @@ async function createCoupons(batches, expirationDate) {
 
     readableCoupons.pipe(createCouponsWritable);
 
-    await new Promise((resolve, reject) => {
-      streamExpired.on('end', resolve);
-      streamExpired.on('error', reject);
-    });
+    console.log(`piped ${amountCoupons} coupons to readable`);
   }
+
+  console.log('Will await createCouponsWritable end or error events');
+  await new Promise((resolve, reject) => {
+    createCouponsWritable.on('end', resolve);
+    createCouponsWritable.on('error', reject);
+  });
+  console.log('Finished createCoupons');
 }
 
 function generateCoupon(batch, expirationDate) {
@@ -283,9 +314,9 @@ function generateCoupon(batch, expirationDate) {
       }
     ],
     'batch': {
-      'id': ObjectID(dbBatcheId),
-      'name': `${batch.name}-${jsonDate}`,
-      'timestamp': dbBatcheTimestemp
+      'id': ObjectId(batch._id),
+      'name': `${batch.name}-${batch.status.timestamp.toJSON()}`,
+      'timestamp': batch.status.timestamp
     }
   }
 

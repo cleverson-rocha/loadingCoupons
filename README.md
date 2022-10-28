@@ -46,3 +46,8 @@ https://nodejs.org/docs/latest-v14.x/api/stream.html
 - _mobile-number-migration_
 
   https://github.com/Minutrade/mobile-number-migration/tree/da78bbad6005dfa4c82ab28f02762928d1c2027c
+
+## Pendências
+
+- Memory leak
+- Liberar terminal
