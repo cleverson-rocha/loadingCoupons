@@ -50,4 +50,9 @@ https://nodejs.org/docs/latest-v14.x/api/stream.html
 ## Pendências
 
 - Memory leak
+
+  - Da documentação do Node: One important caveat is that if the Readable stream emits an error during processing, the Writable destination is not closed automatically. If an error occurs, it will be necessary to manually close each stream in order to prevent memory leaks.
+
 - Liberar terminal
+
+- Melhorar a performance para grandes quantidades de coupons por batchs
