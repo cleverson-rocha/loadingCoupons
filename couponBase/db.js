@@ -21,7 +21,7 @@ const connectDb = async () => {
 const disconnectDb = async () => {
   try {
     await client.close();
-    console.log(chalk.bgHex('#FFA500').black('Database close successfully!'))
+    console.log(chalk.bgGreen.black('Database close successfully!'))
   } catch (error) {
     console.log(chalk.bgRedBright.black('Error closing DB, Detail: ', error));
   }

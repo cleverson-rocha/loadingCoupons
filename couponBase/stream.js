@@ -8,7 +8,7 @@ const getBatchesCollection = () => getDb('bonuzCoupon', 'testeBatches');
 const getCouponsCollection = () => getDb('bonuzCoupon', 'testeCoupons');
 const getPrizesCollection = () => getDb('bonuz', 'prizes');
 
-const amountCoupons = 100;
+const amountCoupons = 1000;
 
 class QueueWritable extends Writable {
   constructor(drainHandler, queueMaxSize, options) {
@@ -21,9 +21,12 @@ class QueueWritable extends Writable {
 
   _write(chunk, encoding, callback) {
     this.queue.push(chunk);
-    console.log('****** Enqueued chunk, current size: ', this.queue.length);
 
-    if (this.queue.length === this.queueMaxSize) {
+    if (this.queue.length % 10_000 === 0) {
+      console.log('****** Enqueued chunk, current size: ', this.queue.length);
+    }
+
+    if (this.queue.length >= this.queueMaxSize) {
       return this.drainQueue(callback);
     }
 
@@ -35,8 +38,11 @@ class QueueWritable extends Writable {
 
     try {
       this.totalOperations += this.queue.length;
+      this.emit('queue-draining');
       await this.drainHandler(this.queue);
+      this.emit('queue-drained');
     } catch (error) {
+      console.log('Caught error on drainQueue', error);
       caughtError = error;
     } finally {
       this.queue = [];
@@ -107,38 +113,51 @@ async function cleanBatches(dateToRemove) {
 }
 
 async function cleanCoupons(dateToRemove) {
-  const query = {
-    $or: [
-      { expirationDate: { $lte: dateToRemove } },
-      { 'status.name': 'expired' }
-    ]
-  };
-
-  const options = { projection: { _id: 1.0, } };
-  const streamExpired = await getCouponsCollection().find(query, options).stream();
-
-  async function deleteCoupons(coupons) {
-    console.log('Executing deleteCoupons');
-    const objectIds = coupons.map((coupon) => ObjectId(coupon._id));
-
+  return new Promise(async (resolve, reject) => {
     const query = {
-      _id: { $in: objectIds }
+      $or: [
+        { expirationDate: { $lte: dateToRemove } },
+        { 'status.name': 'expired' }
+      ]
     };
 
-    const result = await getCouponsCollection().deleteMany(query, { writeConcern: { j: false, w: 0 } });
-    console.log(`deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
-  }
+    const options = { projection: { _id: 1.0, } };
+    const streamExpired = await getCouponsCollection().find(query, options).stream();
 
-  const deleteWritable = new QueueWritable(deleteCoupons, 50_000);
+    async function deleteCoupons(coupons) {
+      console.log('Executing deleteCoupons');
+      const objectIds = coupons.map((coupon) => ObjectId(coupon._id));
 
-  streamExpired.pipe(deleteWritable);
+      const query = {
+        _id: { $in: objectIds }
+      };
 
-  // criar um evento interno para fazer aguardar o drain antes de prosseguir com o pipe
+      const result = await getCouponsCollection().deleteMany(query, { writeConcern: { j: false, w: 0 } });
+      console.log(`deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
+    }
 
-  // await new Promise((resolve, reject) => {
-  //   streamExpired.on('end', resolve);
-  //   streamExpired.on('error', reject);
-  // });
+    const deleteWritable = new QueueWritable(deleteCoupons, 50_000);
+
+    deleteWritable.on('finish', () => {
+      console.log('Finished writing to deleteCoupons');
+      resolve();
+    });
+
+    streamExpired.on('error', () => {
+      streamExpired.destroy();
+      deleteWritable.destroy();
+      reject();
+    });
+
+    streamExpired.pipe(deleteWritable);
+
+    // criar um evento interno para fazer aguardar o drain antes de prosseguir com o pipe
+
+    // await new Promise((resolve, reject) => {
+    //   streamExpired.on('end', resolve);
+    //   streamExpired.on('error', reject);
+    // });
+  });
 }
 
 async function createBatches(expirationDate) {
@@ -146,6 +165,11 @@ async function createBatches(expirationDate) {
   const filteredPrizes = await filterEmptyPrizes(prizes);
   const lastBatchCode = await getLastBatchCode();
   const batches = generateBatches(filteredPrizes, lastBatchCode, expirationDate);
+
+  if (batches.length === 0) {
+    console.log(chalk.bgYellow.black('Nenhum batch criado! Confira se você possui a collection de prizes configurada corretamente!'));
+    throw new Error('No batches created!');
+  }
 
   await getBatchesCollection().insertMany(batches);
 
@@ -261,7 +285,7 @@ function createBatch(prize, lastBatchCode, expirationDate) {
 
 async function createCoupons(batches, expirationDate) {
   console.log('started createCoupons | batches.length: ', batches.length);
-  const createCouponsWritable = new QueueWritable(insertCoupons, 10_000);
+  const createCouponsWritable = new QueueWritable(insertCoupons, 100_000);
 
   async function insertCoupons(coupons) {
     console.log('Executing insertCoupons');
@@ -269,19 +293,51 @@ async function createCoupons(batches, expirationDate) {
     console.log(`insertCoupons finished, coupons.length: ${coupons.length}`);
   }
 
+  let promise;
+  let resolverRef;
+
+  createCouponsWritable.on('queue-draining', () => {
+    console.log('EVENT INTERNAL QUEUE DRAINING RECEIVED');
+
+    if (resolverRef) {
+      console.log('removing resolver ref');
+      createCouponsWritable.off('queue-drained', resolverRef);
+    }
+
+    promise = new Promise((resolve) => {
+      resolverRef = () => {
+        console.log('DRAINED EVENT RECEIVED');
+        resolve();
+      };
+
+      createCouponsWritable.on('queue-drained', resolverRef);
+    });
+  });
+
   for (const batch of batches) {
-    const coupons = new Array(amountCoupons).fill().map(() => generateCoupon(batch, expirationDate));
+    new Array(amountCoupons)
+      .fill()
+      .map(() =>
+        createCouponsWritable.write(generateCoupon(batch, expirationDate))
+      );
+    // TODO: Pensar em quebrar o numero de cupons gerados por iteração. Caso sejam 20_000 poderia ser um problema
 
-    const readableCoupons = Readable.from(coupons);
-
-    readableCoupons.pipe(createCouponsWritable);
-
+    // createCouponsWritable.write(coupons);
     console.log(`piped ${amountCoupons} coupons to readable`);
+
+    if (promise) {
+      console.log('Awaiting coditional promise');
+      await promise;
+    } else {
+      console.log(chalk.bgRed.black('NOT AWAITNG CONDITIONAL PROMISE'));
+    }
   }
+
+  createCouponsWritable.end();
 
   console.log('Will await createCouponsWritable end or error events');
   await new Promise((resolve, reject) => {
-    createCouponsWritable.on('end', resolve);
+    createCouponsWritable.on('close', resolve);
     createCouponsWritable.on('error', reject);
   });
   console.log('Finished createCoupons');
