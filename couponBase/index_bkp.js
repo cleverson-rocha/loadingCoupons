@@ -11,9 +11,80 @@ const start = async () => {
   try {
     await connectDb();
 
+    //Apaga os documentos expirados, com cupons negativos e zerados na collection batches
+    const dbBatchExpiredQuery = {
+      $or: [
+        {
+          expirationDate: {
+            $lte: new Date()
+          }
+        },
+        {
+          'coupons.available': {
+            $lte: 0
+          }
+        }
+      ]
+    }
+    const dbBatchExpiredOption = {
+      projection: {
+        _id: 1.0,
+        bucket: 1.0,
+        'coupons.available': 1.0,
+        expirationDate: 1.0
+      },
+      sort: {
+        _id: -1.0
+      }
+    }
+
+    const dbBatchExpired = await getDb('bonuzCoupon', 'testeBatches').find(dbBatchExpiredQuery, dbBatchExpiredOption).toArray();
+
+    for (const dbBatchExpiredCoupon of dbBatchExpired) {
+
+      let idBatche = dbBatchExpiredCoupon._id
+
+      await getDb('bonuzCoupon', 'testeBatches').deleteOne({ '_id': ObjectID(idBatche) });
+    }
+
+    //Apaga os documentos com status expired na collection coupons
+    const dbCouponsExpiredQuery = {
+      $or: [
+        {
+          expirationDate: {
+            $lte: new Date()
+          }
+        },
+        {
+          'status.name': 'expired'
+        }
+      ]
+    }
+    const dbCouponsExpiredOption = {
+      projection: {
+        _id: 1.0,
+        expirationDate: 1.0,
+        'status.name': 1.0
+      },
+      sort: {
+        _id: -1.0
+      }
+    }
+
+    const dbCouponsExpired = await getDb('bonuzCoupon', 'testeCoupons').find(dbCouponsExpiredQuery, dbCouponsExpiredOption).toArray();
+
+    for (const dbCouponsExpiredCoupon of dbCouponsExpired) {
+
+      let idPrize = dbCouponsExpiredCoupon._id
+
+      await getDb('bonuzCoupon', 'testeCoupons').deleteOne({ '_id': ObjectID(idPrize) });
+    }
+
+
     //Definição da data de expiração dos cupons (validade de um ano)
     const expirationDate = new Date();
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
+
 
     //busca por prizes ativos, cupons e Carrefour
     const prizeQuery = {
@@ -40,6 +111,7 @@ const start = async () => {
     }
 
     const prizeArray = await getDb('bonuz', 'prizes').find(prizeQuery, prizeOptions).toArray();
+
 
     //Busca na collection batches pelo sequencial
     const codeQuery = {}
@@ -117,6 +189,7 @@ const start = async () => {
 
       ]);
 
+
       //Consulta batches para popular o campo batch na collection coupons
       const query = {
         'bucket': prizeList.name
@@ -186,11 +259,20 @@ const start = async () => {
       };
     }
 
+
     //Total geral de cupons
     const totalAmountCoupons = amountCoupons * prizeArray.length;
     console.log(`Total de prizes inseridos: ${chalk.blue.bold(prizeArray.length)}!`);
     console.log(`Collection coupons => Foram inseridos ${chalk.green(amountCoupons)} cupons para cada prize!`);
     console.log(`Total de cupons inseridos na base: ${chalk.yellowBright(totalAmountCoupons)}!`);
+
+
+    //Total de documentos apagados
+    const dbDeleteBatches = dbBatchExpired.length
+    console.log(`Collection batches => Foram apagados um total de ${chalk.red(dbDeleteBatches)} documentos expirados ou com base zerada!`);
+
+    const dbDeleteCouponsExpired = dbCouponsExpired.length
+    console.log(`Collection coupons => Foram apagados um total de ${chalk.red(dbDeleteCouponsExpired)} documentos com status Expired!`);
 
   } catch (err) {
     console.error(err);
