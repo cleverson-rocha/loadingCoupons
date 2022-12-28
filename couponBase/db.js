@@ -1,10 +1,10 @@
 const chalk = require('chalk');
 const { MongoClient } = require('mongodb');
 
-const user = 'dbTest'
-const password = 'B2QuGAciEksqK55C'
+const user = 'xxxxxxxxxxxx'
+const password = 'xxxxxxxxxxxxxx'
 
-// const uri = `mongodb+srv://${user}:${password}@cluster0.b6se8tb.mongodb.net/?retryWrites=true&w=majority`
+// const uri = `mongodb+srv://${user}:${password}@xewards.xat5y.mongodb.net/test`
 const uri = 'mongodb://localhost:27017/'
 
 const client = new MongoClient(uri, { useNewUrlParser: true, useUnifiedTopology: true });

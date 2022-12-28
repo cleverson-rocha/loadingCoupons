@@ -5,7 +5,7 @@ const ObjectID = require('mongodb').ObjectId;
 const randomString = require('randomstring');
 const chalk = require('chalk');
 
-const amountCoupons = 100;
+const amountCoupons = 1000;
 
 const start = async () => {
   try {
@@ -15,31 +15,32 @@ const start = async () => {
     const expirationDate = new Date();
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
 
-    //busca por prizes ativos, cupons e Carrefour
-    const prizeQuery = {
-      'active': true,
-      '$or': [
-        {
-          'deliveryEngine': 'coupon'
-        },
-        {
-          'alliance.name': 'carrefour'
-        }
-      ]
-    }
-    const prizeOptions = {
-      projection: {
-        _id: 0.0,
-        name: 1.0,
-        'alliance.name': 1.0,
-        'alliance.title': 1.0
+    const prizeArray = [
+      {
+        alliance: { name: 'ponto-card', title: 'Ponto Card' },
+        name: 'ponto-card-credito-r50'
       },
-      sort: {
-        _id: -1
-      }
-    }
-
-    const prizeArray = await getDb('bonuz', 'prizes').find(prizeQuery, prizeOptions).toArray();
+      {
+        alliance: { name: 'ponto-card', title: 'Ponto Card' },
+        name: 'ponto-card-credito-r100'
+      },
+      {
+        alliance: { name: 'ponto-card', title: 'Ponto Card' },
+        name: 'ponto-card-credito-r150'
+      },
+      {
+        alliance: { name: 'ponto-card', title: 'Ponto Card' },
+        name: 'ponto-card-credito-r300'
+      },
+      {
+        alliance: { name: 'ponto-card', title: 'Ponto Card' },
+        name: 'ponto-card-credito-r500'
+      },
+      {
+        alliance: { name: 'ponto-card', title: 'Ponto Card' },
+        name: 'ponto-card-credito-r1000'
+      },
+    ]
 
     //Busca na collection batches pelo sequencial
     const codeQuery = {}
@@ -53,7 +54,7 @@ const start = async () => {
       }
     }
 
-    const codeSearch = await getDb('bonuzCoupon', 'testeBatches').find(codeQuery, codeOptions).limit(1).toArray();
+    const codeSearch = await getDb('bonuzCoupon', 'batches').find(codeQuery, codeOptions).limit(1).toArray();
 
 
     if (!codeSearch.length) {
@@ -68,7 +69,7 @@ const start = async () => {
       //sequencial
       resultCode++
 
-      await getDb('bonuzCoupon', 'testeBatches').insertMany([
+      await getDb('bonuzCoupon', 'batches').insertMany([
         {
           'file': 'loadingCoupons',
           'user': {
@@ -132,7 +133,7 @@ const start = async () => {
         }
       }
 
-      const bucketProperties = await getDb('bonuzCoupon', 'testeBatches').findOne(query, options);
+      const bucketProperties = await getDb('bonuzCoupon', 'batches').findOne(query, options);
 
       const dbBatcheTimestemp = bucketProperties.status.timestamp;
       const dbBatcheId = bucketProperties._id;
@@ -152,7 +153,7 @@ const start = async () => {
 
         codeGenerator()
 
-        await getDb('bonuzCoupon', 'testeCoupons').insertMany([
+        await getDb('bonuzCoupon', 'coupons').insertMany([
           {
             'alliance': prizeList.alliance.name,
             'bucket': prizeList.name,
