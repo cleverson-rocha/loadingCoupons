@@ -87,6 +87,7 @@ async function cleanBatches(dateToRemove) {
       { 'coupons.available': { $lte: 0 } }
     ]
   }
+  console.log('cleanBatches query', query);
   const options = { projection: { _id: 1.0, } };
   const streamExpired = await getBatchesCollection().find(query, options).stream();
 
@@ -120,6 +121,7 @@ async function cleanCoupons(dateToRemove) {
         { 'status.name': 'expired' }
       ]
     };
+    console.log('cleanCoupons query', query);
 
     const options = { projection: { _id: 1.0, } };
     const streamExpired = await getCouponsCollection().find(query, options).stream();
@@ -132,7 +134,7 @@ async function cleanCoupons(dateToRemove) {
         _id: { $in: objectIds }
       };
 
-      const result = await getCouponsCollection().deleteMany(query, { writeConcern: { j: false, w: 0 } });
+      const result = await getCouponsCollection().deleteMany(query);
       console.log(`deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
     }
 
@@ -150,13 +152,6 @@ async function cleanCoupons(dateToRemove) {
     });
 
     streamExpired.pipe(deleteWritable);
-
-    // criar um evento interno para fazer aguardar o drain antes de prosseguir com o pipe
-
-    // await new Promise((resolve, reject) => {
-    //   streamExpired.on('end', resolve);
-    //   streamExpired.on('error', reject);
-    // });
   });
 }
 
@@ -387,17 +382,5 @@ function generateCouponCode() {
 
   prizeCoupon = `MINU${alphanumeric.toUpperCase()}`
 };
-
-// async function deleteBatches(batches) {
-//   console.log('Executing deleteBatches');
-//   const objectIds = batches.map((batch) => ObjectId(batch._id));
-
-//   const query = {
-//     _id: { $in: objectIds }
-//   };
-
-//   const result = await getBatchesCollection().deleteMany(query);
-//   console.log(`deleteBatches finished, batches.length: ${batches.length} | deletedCount: ${result.deletedCount}`);
-// }
 
 start();
