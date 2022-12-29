@@ -8,7 +8,7 @@ const getBatchesCollection = () => getDb('bonuzCoupon', 'testeBatches');
 const getCouponsCollection = () => getDb('bonuzCoupon', 'testeCoupons');
 const getPrizesCollection = () => getDb('bonuz', 'prizes');
 
-const amountCoupons = 1000;
+const amountCoupons = 10_000;
 
 class QueueWritable extends Writable {
   constructor(drainHandler, queueMaxSize, options) {
@@ -56,8 +56,6 @@ class QueueWritable extends Writable {
     } else {
       callback(null);
     }
-
-    console.log('finished, totalOperations:', this.totalOperations);
   }
 }
 
@@ -87,7 +85,6 @@ async function cleanBatches(dateToRemove) {
       { 'coupons.available': { $lte: 0 } }
     ]
   }
-  console.log('cleanBatches query', query);
   const options = { projection: { _id: 1.0, } };
   const streamExpired = await getBatchesCollection().find(query, options).stream();
 
@@ -121,7 +118,6 @@ async function cleanCoupons(dateToRemove) {
         { 'status.name': 'expired' }
       ]
     };
-    console.log('cleanCoupons query', query);
 
     const options = { projection: { _id: 1.0, } };
     const streamExpired = await getCouponsCollection().find(query, options).stream();
@@ -141,7 +137,6 @@ async function cleanCoupons(dateToRemove) {
     const deleteWritable = new QueueWritable(deleteCoupons, 50_000);
 
     deleteWritable.on('finish', () => {
-      console.log('Finished writing to deleteCoupons');
       resolve();
     });
 
@@ -279,29 +274,37 @@ function createBatch(prize, lastBatchCode, expirationDate) {
 }
 
 async function createCoupons(batches, expirationDate) {
-  console.log('started createCoupons | batches.length: ', batches.length);
+  console.log(chalk.bgCyan.black('Iniciando o cadastro de cupons, total de batches criados: ', batches.length));
   const createCouponsWritable = new QueueWritable(insertCoupons, 100_000);
+  let totalCoupons = 0;
+  const totalCouponsToInsert = batches.length * amountCoupons;
 
   async function insertCoupons(coupons) {
-    console.log('Executing insertCoupons');
-    await getCouponsCollection().insertMany(coupons);
-    console.log(`insertCoupons finished, coupons.length: ${coupons.length}`);
+    const { insertedCount } = await getCouponsCollection().insertMany(coupons);
+    totalCoupons += insertedCount;
+
+    const updateLog = {
+      'Cupons inseridos': totalCoupons.toLocaleString(),
+      'Total': totalCouponsToInsert.toLocaleString(),
+      'Saldo restante': (totalCouponsToInsert - totalCoupons).toLocaleString(),
+      'Progresso': Math.round((totalCoupons / totalCouponsToInsert) * 100) + '%'
+    }
+
+    console.table(updateLog)
+
+    console.log(chalk.bgCyan.black(`Inserindo ${coupons.length.toLocaleString()} cupons de ${(batches.length * amountCoupons).toLocaleString()}`));
   }
 
   let promise;
   let resolverRef;
 
   createCouponsWritable.on('queue-draining', () => {
-    console.log('EVENT INTERNAL QUEUE DRAINING RECEIVED');
-
     if (resolverRef) {
-      console.log('removing resolver ref');
       createCouponsWritable.off('queue-drained', resolverRef);
     }
 
     promise = new Promise((resolve) => {
       resolverRef = () => {
-        console.log('DRAINED EVENT RECEIVED');
         resolve();
       };
 
@@ -315,27 +318,19 @@ async function createCoupons(batches, expirationDate) {
       .map(() =>
         createCouponsWritable.write(generateCoupon(batch, expirationDate))
       );
-    // TODO: Pensar em quebrar o numero de cupons gerados por iteração. Caso sejam 20_000 poderia ser um problema
-
-    // createCouponsWritable.write(coupons);
-    console.log(`piped ${amountCoupons} coupons to readable`);
 
     if (promise) {
-      console.log('Awaiting coditional promise');
       await promise;
-    } else {
-      console.log(chalk.bgRed.black('NOT AWAITNG CONDITIONAL PROMISE'));
     }
   }
 
   createCouponsWritable.end();
 
-  console.log('Will await createCouponsWritable end or error events');
   await new Promise((resolve, reject) => {
     createCouponsWritable.on('close', resolve);
     createCouponsWritable.on('error', reject);
   });
-  console.log('Finished createCoupons');
+  console.log(`Coupons: Foram inseridos ${totalCoupons} cupons na base!`);
 }
 
 function generateCoupon(batch, expirationDate) {
