@@ -2,10 +2,10 @@
   "name": "carregar_cupons",
   "version": "1.0.0",
   "description": "Aplicação para carregar automaticamente cupons na base.",
-  "main": "index.js",
+  "main": "stream.js",
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
-    "start": "node index.js"
+    "start": "node stream.js"
   },
   "keywords": [],
   "author": "Cleverson Rocha",

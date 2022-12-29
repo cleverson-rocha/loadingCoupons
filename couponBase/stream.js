@@ -4,11 +4,11 @@ const randomString = require('randomstring');
 const chalk = require('chalk');
 const { connectDb, disconnectDb, getDb } = require('./db');
 
-const getBatchesCollection = () => getDb('bonuzCoupon', 'testeBatches');
-const getCouponsCollection = () => getDb('bonuzCoupon', 'testeCoupons');
+const getBatchesCollection = () => getDb('bonuzCoupon', 'batches');
+const getCouponsCollection = () => getDb('bonuzCoupon', 'coupons');
 const getPrizesCollection = () => getDb('bonuz', 'prizes');
 
-const amountCoupons = 10_000;
+const amountCoupons = 100;
 
 class QueueWritable extends Writable {
   constructor(drainHandler, queueMaxSize, options) {
