@@ -52,7 +52,7 @@ class QueueWritable extends Writable {
 
   _final(callback) {
     if (this.queue.length > 0) {
-      this.drainQueue(callback)
+      this.drainQueue(callback);
     } else {
       callback(null);
     }
@@ -80,12 +80,9 @@ async function start() {
 
 async function cleanBatches(dateToRemove) {
   const query = {
-    $or: [
-      { expirationDate: { $lte: dateToRemove } },
-      { 'coupons.available': { $lte: 0 } }
-    ]
-  }
-  const options = { projection: { _id: 1.0, } };
+    $or: [{ expirationDate: { $lte: dateToRemove } }, { 'coupons.available': { $lte: 0 } }]
+  };
+  const options = { projection: { _id: 1.0 } };
   const streamExpired = await getBatchesCollection().find(query, options).stream();
 
   async function deleteBatches(batches) {
@@ -113,13 +110,10 @@ async function cleanBatches(dateToRemove) {
 async function cleanCoupons(dateToRemove) {
   return new Promise(async (resolve, reject) => {
     const query = {
-      $or: [
-        { expirationDate: { $lte: dateToRemove } },
-        { 'status.name': 'expired' }
-      ]
+      $or: [{ expirationDate: { $lte: dateToRemove } }, { 'status.name': 'expired' }]
     };
 
-    const options = { projection: { _id: 1.0, } };
+    const options = { projection: { _id: 1.0 } };
     const streamExpired = await getCouponsCollection().find(query, options).stream();
 
     async function deleteCoupons(coupons) {
@@ -170,17 +164,17 @@ async function getPrizes() {
   const prizeQuery = {
     'active': true,
     '$or': [{ 'deliveryEngine': 'coupon' }, { 'alliance.name': 'carrefour' }]
-  }
+  };
 
   // SELECT prizes.name
-  // FROM prizes 
+  // FROM prizes
   // WHERE ACTIVE = true AND (delivery = 'coupon' OR allianceName = 'carrefour')
   // LEFT JOIN batches WHERE prize.name = batches.bucket AND (batches.bucket IS NULL OR batches.available = 0)
 
   const prizeOptions = {
     projection: { _id: 0.0, name: 1.0, 'alliance.name': 1.0, 'alliance.title': 1.0 },
     sort: { _id: -1 }
-  }
+  };
 
   const prizeArray = await getPrizesCollection().find(prizeQuery, prizeOptions).toArray();
 
@@ -206,7 +200,7 @@ async function getLastBatchCode() {
   const options = {
     projection: { code: 1.0, _id: 0 },
     sort: { code: -1.0 }
-  }
+  };
 
   const [lastBatch] = await getDb('bonuzCoupon', 'testeBatches').find({}, options).limit(1).toArray();
 
@@ -233,11 +227,9 @@ function createBatch(prize, lastBatchCode, expirationDate) {
     'bucket': prize.name,
     'alliance': {
       'name': prize.alliance.name,
-      'title': prize.alliance.title,
+      'title': prize.alliance.title
     },
-    'experiences': [
-
-    ],
+    'experiences': [],
     'code': lastBatchCode,
     'status': {
       'name': 'processed',
@@ -268,7 +260,7 @@ function createBatch(prize, lastBatchCode, expirationDate) {
     'totalRows': amountCoupons,
     'initialDate': new Date(),
     'expirationDate': expirationDate
-  }
+  };
 
   return batch;
 }
@@ -288,9 +280,9 @@ async function createCoupons(batches, expirationDate) {
       'Total': totalCouponsToInsert.toLocaleString(),
       'Saldo restante': (totalCouponsToInsert - totalCoupons).toLocaleString(),
       'Progresso': Math.round((totalCoupons / totalCouponsToInsert) * 100) + '%'
-    }
+    };
 
-    console.table(updateLog)
+    console.table(updateLog);
 
     console.log(chalk.bgCyan.black(`Inserindo ${coupons.length.toLocaleString()} cupons de ${(batches.length * amountCoupons).toLocaleString()}`));
   }
@@ -313,11 +305,7 @@ async function createCoupons(batches, expirationDate) {
   });
 
   for (const batch of batches) {
-    new Array(amountCoupons)
-      .fill()
-      .map(() =>
-        createCouponsWritable.write(generateCoupon(batch, expirationDate))
-      );
+    new Array(amountCoupons).fill().map(() => createCouponsWritable.write(generateCoupon(batch, expirationDate)));
 
     if (promise) {
       await promise;
@@ -364,7 +352,7 @@ function generateCoupon(batch, expirationDate) {
       'name': `${batch.name}-${batch.status.timestamp.toJSON()}`,
       'timestamp': batch.status.timestamp
     }
-  }
+  };
 
   return coupon;
 }
@@ -375,7 +363,7 @@ function generateCouponCode() {
     charset: 'alphanumeric'
   });
 
-  prizeCoupon = `MINU${alphanumeric.toUpperCase()}`
-};
+  prizeCoupon = `MINU${alphanumeric.toUpperCase()}`;
+}
 
 start();

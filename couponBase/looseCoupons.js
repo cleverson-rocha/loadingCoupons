@@ -39,35 +39,33 @@ const start = async () => {
       {
         alliance: { name: 'ponto-card', title: 'Ponto Card' },
         name: 'ponto-card-credito-r1000'
-      },
-    ]
+      }
+    ];
 
     //Busca na collection batches pelo sequencial
-    const codeQuery = {}
+    const codeQuery = {};
     const codeOptions = {
       projection: {
         code: 1.0,
-        _id: 0,
+        _id: 0
       },
       sort: {
         code: -1.0
       }
-    }
+    };
 
     const codeSearch = await getDb('bonuzCoupon', 'batches').find(codeQuery, codeOptions).limit(1).toArray();
 
-
     if (!codeSearch.length) {
-      resultCode = 0
+      resultCode = 0;
     } else {
-      resultCode = codeSearch[0].code
+      resultCode = codeSearch[0].code;
     }
 
     //Iteração para a criação do arquivo batche na collection batches
     for (const prizeList of prizeArray) {
-
       //sequencial
-      resultCode++
+      resultCode++;
 
       await getDb('bonuzCoupon', 'batches').insertMany([
         {
@@ -79,11 +77,9 @@ const start = async () => {
           'bucket': prizeList.name,
           'alliance': {
             'name': prizeList.alliance.name,
-            'title': prizeList.alliance.title,
+            'title': prizeList.alliance.title
           },
-          'experiences': [
-
-          ],
+          'experiences': [],
           'code': resultCode,
           'status': {
             'name': 'processed',
@@ -115,13 +111,12 @@ const start = async () => {
           'initialDate': new Date(),
           'expirationDate': expirationDate
         }
-
       ]);
 
       //Consulta batches para popular o campo batch na collection coupons
       const query = {
         'bucket': prizeList.name
-      }
+      };
       const options = {
         projection: {
           _id: 1.0,
@@ -131,7 +126,7 @@ const start = async () => {
         sort: {
           _id: -1
         }
-      }
+      };
 
       const bucketProperties = await getDb('bonuzCoupon', 'batches').findOne(query, options);
 
@@ -140,7 +135,6 @@ const start = async () => {
       const jsonDate = dbBatcheTimestemp.toJSON(); //converte o timestamp para concatenar com o name no campo batch na collection coupons
 
       for (i = 0; i < amountCoupons; i++) {
-
         //gerador de cupons randômico
         const codeGenerator = () => {
           let alphanumeric = randomString.generate({
@@ -148,10 +142,10 @@ const start = async () => {
             charset: 'alphanumeric'
           });
 
-          prizeCoupon = `MINU${alphanumeric.toUpperCase()}`
+          prizeCoupon = `MINU${alphanumeric.toUpperCase()}`;
         };
 
-        codeGenerator()
+        codeGenerator();
 
         await getDb('bonuzCoupon', 'coupons').insertMany([
           {
@@ -184,7 +178,7 @@ const start = async () => {
             }
           }
         ]);
-      };
+      }
     }
 
     //Total geral de cupons
@@ -192,12 +186,11 @@ const start = async () => {
     console.log(`Total de prizes inseridos: ${chalk.blue.bold(prizeArray.length)}!`);
     console.log(`Collection coupons => Foram inseridos ${chalk.green(amountCoupons)} cupons para cada prize!`);
     console.log(`Total de cupons inseridos na base: ${chalk.yellowBright(totalAmountCoupons)}!`);
-
   } catch (err) {
     console.error(err);
   } finally {
-    await disconnectDb()
-  };
+    await disconnectDb();
+  }
 };
 
 start();
