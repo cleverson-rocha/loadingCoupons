@@ -11,7 +11,6 @@ const start = async () => {
   try {
     await connectDb();
 
-    //Definição da data de expiração dos cupons (validade de um ano)
     const expirationDate = new Date();
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
 
@@ -181,7 +180,6 @@ const start = async () => {
       }
     }
 
-    //Total geral de cupons
     const totalAmountCoupons = amountCoupons * prizeArray.length;
     console.log(`Total de prizes inseridos: ${chalk.blue.bold(prizeArray.length)}!`);
     console.log(`Collection coupons => Foram inseridos ${chalk.green(amountCoupons)} cupons para cada prize!`);

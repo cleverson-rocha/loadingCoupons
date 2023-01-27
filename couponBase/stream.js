@@ -8,7 +8,7 @@ const getBatchesCollection = () => getDb('bonuzCoupon', 'batches');
 const getCouponsCollection = () => getDb('bonuzCoupon', 'coupons');
 const getPrizesCollection = () => getDb('bonuz', 'prizes');
 
-const amountCoupons = 100;
+const amountCoupons = 1000;
 
 class QueueWritable extends Writable {
   constructor(drainHandler, queueMaxSize, options) {
