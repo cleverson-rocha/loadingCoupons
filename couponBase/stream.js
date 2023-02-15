@@ -8,7 +8,7 @@ const getBatchesCollection = () => getDb('bonuzCoupon', 'batches');
 const getCouponsCollection = () => getDb('bonuzCoupon', 'coupons');
 const getPrizesCollection = () => getDb('bonuz', 'prizes');
 
-const amountCoupons = 1000;
+const amountCoupons = 2000;
 
 class QueueWritable extends Writable {
   constructor(drainHandler, queueMaxSize, options) {
@@ -80,7 +80,10 @@ async function start() {
 
 async function cleanBatches(dateToRemove) {
   const query = {
-    $or: [{ expirationDate: { $lte: dateToRemove } }, { 'coupons.available': { $lte: 0 } }]
+    $or: [
+      { expirationDate: { $lte: dateToRemove } },
+      { 'coupons.available': { $lte: 0 } }
+    ]
   };
   const options = { projection: { _id: 1.0 } };
   const streamExpired = await getBatchesCollection().find(query, options).stream();
@@ -94,7 +97,9 @@ async function cleanBatches(dateToRemove) {
     };
 
     const result = await getBatchesCollection().deleteMany(query);
-    console.log(`deleteBatches finished, batches.length: ${batches.length} | deletedCount: ${result.deletedCount}`);
+    console.log(
+      `deleteBatches finished, batches.length: ${batches.length} | deletedCount: ${result.deletedCount}`
+    );
   }
 
   const deleteWritable = new QueueWritable(deleteBatches, 1_000);
@@ -125,7 +130,9 @@ async function cleanCoupons(dateToRemove) {
       };
 
       const result = await getCouponsCollection().deleteMany(query);
-      console.log(`deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`);
+      console.log(
+        `deleteCoupons finished, coupons.length: ${coupons.length} | deletedCount: ${result.deletedCount}`
+      );
     }
 
     const deleteWritable = new QueueWritable(deleteCoupons, 50_000);
@@ -151,7 +158,11 @@ async function createBatches(expirationDate) {
   const batches = generateBatches(filteredPrizes, lastBatchCode, expirationDate);
 
   if (batches.length === 0) {
-    console.log(chalk.bgYellow.black('Nenhum batch criado! Confira se você possui a collection de prizes configurada corretamente!'));
+    console.log(
+      chalk.bgYellow.black(
+        'Nenhum batch criado! Confira se você possui a collection de prizes configurada corretamente!'
+      )
+    );
     throw new Error('No batches created!');
   }
 
@@ -202,7 +213,10 @@ async function getLastBatchCode() {
     sort: { code: -1.0 }
   };
 
-  const [lastBatch] = await getDb('bonuzCoupon', 'testeBatches').find({}, options).limit(1).toArray();
+  const [lastBatch] = await getDb('bonuzCoupon', 'testeBatches')
+    .find({}, options)
+    .limit(1)
+    .toArray();
 
   if (!lastBatch) {
     return 0;
@@ -212,7 +226,9 @@ async function getLastBatchCode() {
 }
 
 function generateBatches(prizes, lastBatchCode, expirationDate) {
-  const batches = prizes.map((prize) => createBatch(prize, lastBatchCode, expirationDate));
+  const batches = prizes.map((prize) =>
+    createBatch(prize, lastBatchCode, expirationDate)
+  );
 
   return batches;
 }
@@ -266,7 +282,12 @@ function createBatch(prize, lastBatchCode, expirationDate) {
 }
 
 async function createCoupons(batches, expirationDate) {
-  console.log(chalk.bgCyan.black('Iniciando o cadastro de cupons, total de batches criados: ', batches.length));
+  console.log(
+    chalk.bgCyan.black(
+      'Iniciando o cadastro de cupons, total de batches criados: ',
+      batches.length
+    )
+  );
   const createCouponsWritable = new QueueWritable(insertCoupons, 100_000);
   let totalCoupons = 0;
   const totalCouponsToInsert = batches.length * amountCoupons;
@@ -284,7 +305,13 @@ async function createCoupons(batches, expirationDate) {
 
     console.table(updateLog);
 
-    console.log(chalk.bgCyan.black(`Inserindo ${coupons.length.toLocaleString()} cupons de ${(batches.length * amountCoupons).toLocaleString()}`));
+    console.log(
+      chalk.bgCyan.black(
+        `Inserindo ${coupons.length.toLocaleString()} cupons de ${(
+          batches.length * amountCoupons
+        ).toLocaleString()}`
+      )
+    );
   }
 
   let promise;
@@ -305,7 +332,9 @@ async function createCoupons(batches, expirationDate) {
   });
 
   for (const batch of batches) {
-    new Array(amountCoupons).fill().map(() => createCouponsWritable.write(generateCoupon(batch, expirationDate)));
+    new Array(amountCoupons)
+      .fill()
+      .map(() => createCouponsWritable.write(generateCoupon(batch, expirationDate)));
 
     if (promise) {
       await promise;
@@ -319,6 +348,17 @@ async function createCoupons(batches, expirationDate) {
     createCouponsWritable.on('error', reject);
   });
   console.log(`Coupons: Foram inseridos ${totalCoupons} cupons na base!`);
+}
+
+function generateCouponCode() {
+  let alphanumeric = randomString.generate({
+    length: 8,
+    charset: 'alphanumeric'
+  });
+
+  prizeCoupon = `MINU${alphanumeric.toUpperCase()}`;
+
+  return prizeCoupon;
 }
 
 function generateCoupon(batch, expirationDate) {
@@ -355,15 +395,6 @@ function generateCoupon(batch, expirationDate) {
   };
 
   return coupon;
-}
-
-function generateCouponCode() {
-  let alphanumeric = randomString.generate({
-    length: 8,
-    charset: 'alphanumeric'
-  });
-
-  prizeCoupon = `MINU${alphanumeric.toUpperCase()}`;
 }
 
 start();
