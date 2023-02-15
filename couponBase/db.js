@@ -1,8 +1,8 @@
 const chalk = require('chalk');
 const { MongoClient } = require('mongodb');
 
-const user = 'xxxxxxxxxxxx';
-const password = 'xxxxxxxxxxxxxx';
+const user = 'xxxxxxxxxxx';
+const password = 'xxxxxxxxxxxxx';
 
 // const uri = `mongodb+srv://${user}:${password}@xewards.xat5y.mongodb.net/test`
 const uri = 'mongodb://localhost:27017/';
