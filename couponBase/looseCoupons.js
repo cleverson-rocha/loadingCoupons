@@ -5,7 +5,7 @@ const ObjectID = require('mongodb').ObjectId;
 const randomString = require('randomstring');
 const chalk = require('chalk');
 
-const amountCoupons = 1000;
+const amountCoupons = 100;
 
 const start = async () => {
   try {
@@ -13,31 +13,12 @@ const start = async () => {
 
     const expirationDate = new Date();
     expirationDate.setFullYear(expirationDate.getFullYear() + 1);
-
+    const name = 'luckau';
+    const title = 'Luckau';
     const prizeArray = [
       {
-        alliance: { name: 'ponto-card', title: 'Ponto Card' },
-        name: 'ponto-card-credito-r50'
-      },
-      {
-        alliance: { name: 'ponto-card', title: 'Ponto Card' },
-        name: 'ponto-card-credito-r100'
-      },
-      {
-        alliance: { name: 'ponto-card', title: 'Ponto Card' },
-        name: 'ponto-card-credito-r150'
-      },
-      {
-        alliance: { name: 'ponto-card', title: 'Ponto Card' },
-        name: 'ponto-card-credito-r300'
-      },
-      {
-        alliance: { name: 'ponto-card', title: 'Ponto Card' },
-        name: 'ponto-card-credito-r500'
-      },
-      {
-        alliance: { name: 'ponto-card', title: 'Ponto Card' },
-        name: 'ponto-card-credito-r1000'
+        alliance: { name: name, title: title },
+        name: 'luckau-desconto-r12'
       }
     ];
 
